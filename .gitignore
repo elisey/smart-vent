@@ -1,0 +1,42 @@
+# Home Assistant
+config/.storage/
+config/.cloud/
+config/deps/
+config/tts/
+config/secrets.yaml
+config/known_devices.yaml
+config/home-assistant.log
+config/home-assistant_v2.db*
+config/OZW_Log.txt
+config/.google.token
+config/*.db-shm
+config/*.db-wal
+config/*.log.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes (не игнорируй если хочешь сохранять состояние)
+# config/
+
+# Temporary files
+*.tmp
+*.bak

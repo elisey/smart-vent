@@ -1,0 +1,287 @@
+# Home Assistant Configuration для разработки Smart Vent
+# Этот файл создаёт эмулированные устройства для тестирования
+
+homeassistant:
+  name: Smart Vent Dev
+  latitude: 52.1551
+  longitude: 5.3878
+  elevation: 0
+  unit_system: metric
+  time_zone: Europe/Amsterdam
+
+# Включаем основные интеграции
+default_config:
+
+# Логирование (полезно для отладки)
+logger:
+  default: info
+  logs:
+    custom_components.smart_vent: debug  # Детальные логи твоего компонента
+    homeassistant.components.fan: debug
+    homeassistant.components.sensor: debug
+
+# Веб-интерфейс
+http:
+  server_host: 0.0.0.0
+
+# ============================================================================
+# ЭМУЛИРОВАННЫЕ УСТРОЙСТВА ДЛЯ ТЕСТИРОВАНИЯ
+# ============================================================================
+
+# Датчик влажности (эмуляция Xiaomi BLE)
+sensor:
+  - platform: template
+    sensors:
+      temperature_humidity_sensor_9970_humidity:
+        friendly_name: "Test Humidity Sensor"
+        unit_of_measurement: "%"
+        value_template: >
+          {{ states('input_number.test_humidity') | float }}
+        icon_template: mdi:water-percent
+
+# Входы Shelly Dimmer (эмуляция input_0 и input_1)
+binary_sensor:
+  - platform: template
+    sensors:
+      shelly_input_0:
+        friendly_name: "Shelly Input 0"
+        value_template: >
+          {{ is_state('input_boolean.shelly_input_0', 'on') }}
+        icon_template: mdi:toggle-switch
+        
+      shelly_input_1:
+        friendly_name: "Shelly Input 1"
+        value_template: >
+          {{ is_state('input_boolean.shelly_input_1', 'on') }}
+        icon_template: mdi:toggle-switch
+
+# Реальный вентилятор (эмуляция Shelly Dimmer 0/1-10V)
+fan:
+  - platform: template
+    fans:
+      real_fan:
+        friendly_name: "Test Fan (Shelly Dimmer)"
+        value_template: "on"  # Всегда включен
+        percentage_template: >
+          {{ states('input_number.fan_speed') | int }}
+        speed_count: 100
+        set_percentage:
+          - service: input_number.set_value
+            target:
+              entity_id: input_number.fan_speed
+            data:
+              value: "{{ percentage }}"
+          - service: system_log.write
+            data:
+              message: "Fan speed set to {{ percentage }}%"
+              level: info
+        turn_on:
+          - service: system_log.write
+            data:
+              message: "Fan turned ON"
+              level: info
+        turn_off:
+          - service: system_log.write
+            data:
+              message: "Fan turned OFF (not supported in real setup)"
+              level: warning
+
+# ============================================================================
+# HELPER ENTITIES (для управления тестовыми устройствами)
+# ============================================================================
+
+input_number:
+  # Контроль влажности для тестов
+  test_humidity:
+    name: "Test Humidity Control"
+    min: 0
+    max: 100
+    step: 1
+    initial: 50
+    unit_of_measurement: "%"
+    icon: mdi:water-percent
+  
+  # Текущая скорость вентилятора (внутреннее состояние)
+  fan_speed:
+    name: "Current Fan Speed"
+    min: 0
+    max: 100
+    step: 1
+    initial: 30
+    unit_of_measurement: "%"
+    icon: mdi:fan
+
+input_boolean:
+  # Эмуляция входов Shelly
+  shelly_input_0:
+    name: "Shelly Input 0 (Switch Position Bit 0)"
+    initial: off
+    icon: mdi:toggle-switch-off
+    
+  shelly_input_1:
+    name: "Shelly Input 1 (Switch Position Bit 1)"
+    initial: off
+    icon: mdi:toggle-switch-off
+
+# ============================================================================
+# АВТОМАТИЗАЦИИ ДЛЯ ТЕСТОВЫХ СЦЕНАРИЕВ
+# ============================================================================
+
+automation:
+  # Автоматизация для симуляции роста влажности
+  - id: simulate_humidity_rise
+    alias: "Test: Simulate Humidity Rise"
+    description: "Постепенно повышает влажность для тестирования авто-boost"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.simulate_high_humidity
+        to: "on"
+    action:
+      - repeat:
+          while:
+            - condition: state
+              entity_id: input_boolean.simulate_high_humidity
+              state: "on"
+            - condition: numeric_state
+              entity_id: input_number.test_humidity
+              below: 85
+          sequence:
+            - service: input_number.increment
+              target:
+                entity_id: input_number.test_humidity
+            - delay: "00:00:02"
+  
+  # Автоматизация для быстрой установки высокой влажности
+  - id: set_high_humidity
+    alias: "Test: Set High Humidity (>80%)"
+    description: "Быстро устанавливает влажность 85% для теста"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.quick_high_humidity
+        to: "on"
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.test_humidity
+        data:
+          value: 85
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.quick_high_humidity
+
+  # Автоматизация для установки нормальной влажности
+  - id: set_normal_humidity
+    alias: "Test: Set Normal Humidity"
+    description: "Устанавливает влажность 60%"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.quick_normal_humidity
+        to: "on"
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.test_humidity
+        data:
+          value: 60
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.quick_normal_humidity
+
+input_boolean:
+  # Контроллеры для тестовых сценариев
+  simulate_high_humidity:
+    name: "Simulate Gradual Humidity Rise"
+    initial: off
+    icon: mdi:chart-line
+    
+  quick_high_humidity:
+    name: "Quick Set: High Humidity (85%)"
+    initial: off
+    icon: mdi:water-alert
+    
+  quick_normal_humidity:
+    name: "Quick Set: Normal Humidity (60%)"
+    initial: off
+    icon: mdi:water
+
+# ============================================================================
+# СКРИПТЫ ДЛЯ БЫСТРОГО ТЕСТИРОВАНИЯ
+# ============================================================================
+
+script:
+  # Установить переключатель в LOW (off/off)
+  set_switch_low:
+    alias: "Set Switch to LOW"
+    sequence:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.shelly_input_0
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.shelly_input_1
+      - service: system_log.write
+        data:
+          message: "Switch set to LOW (0/0)"
+          level: info
+  
+  # Установить переключатель в MID (on/off)
+  set_switch_mid:
+    alias: "Set Switch to MID"
+    sequence:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.shelly_input_0
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.shelly_input_1
+      - service: system_log.write
+        data:
+          message: "Switch set to MID (1/0)"
+          level: info
+  
+  # Установить переключатель в BOOST (off/on)
+  set_switch_boost:
+    alias: "Set Switch to BOOST"
+    sequence:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.shelly_input_0
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.shelly_input_1
+      - service: system_log.write
+        data:
+          message: "Switch set to BOOST (0/1)"
+          level: info
+  
+  # Установить переключатель в INVALID (on/on)
+  set_switch_invalid:
+    alias: "Set Switch to INVALID"
+    sequence:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.shelly_input_0
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.shelly_input_1
+      - service: system_log.write
+        data:
+          message: "Switch set to INVALID (1/1) - should trigger error handling"
+          level: warning
+
+# ============================================================================
+# КОНФИГУРАЦИЯ SMART VENT (когда компонент будет готов)
+# ============================================================================
+
+# Раскомментируй после создания компонента:
+# smart_vent:
+#   fan_entity: fan.real_fan
+#   humidity_sensor: sensor.temperature_humidity_sensor_9970_humidity
+#   input_0: binary_sensor.shelly_input_0
+#   input_1: binary_sensor.shelly_input_1
+#   speeds:
+#     low: 30
+#     mid: 52
+#     boost: 100
+#   check_interval: 20
+#   max_boosts_per_day: 5
