@@ -7,6 +7,7 @@ from datetime import timedelta
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+from homeassistant.helpers.discovery import async_load_platform
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
@@ -107,6 +108,17 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         hass,
         async_periodic_update,
         timedelta(seconds=conf["check_interval"]),
+    )
+
+    # Load the fan platform
+    hass.async_create_task(
+        async_load_platform(
+            hass,
+            "fan",
+            DOMAIN,
+            {"coordinator": coordinator},
+            config,
+        )
     )
 
     _LOGGER.info("Smart Ventilation Controller component loaded")
