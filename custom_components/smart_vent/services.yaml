@@ -1,0 +1,17 @@
+set_mode:
+  name: Set ventilation mode
+  description: Set the ventilation mode (low, mid, or boost)
+  fields:
+    mode:
+      name: Mode
+      description: The ventilation mode to set
+      required: true
+      selector:
+        select:
+          options:
+            - label: "Low"
+              value: "low"
+            - label: "Mid"
+              value: "mid"
+            - label: "Boost"
+              value: "boost"

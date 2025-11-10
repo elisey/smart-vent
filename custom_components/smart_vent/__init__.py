@@ -121,6 +121,21 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         )
     )
 
+    # Register services
+    async def handle_set_mode(call):
+        """Handle the set_mode service call."""
+        mode = call.data.get("mode")
+
+        # Validate mode
+        if mode not in ["low", "mid", "boost"]:
+            _LOGGER.error("Invalid mode '%s'. Must be one of: low, mid, boost", mode)
+            return
+
+        _LOGGER.info("Service call: set_mode to '%s'", mode)
+        await coordinator.set_mode(mode)
+
+    hass.services.async_register(DOMAIN, "set_mode", handle_set_mode)
+
     _LOGGER.info("Smart Ventilation Controller component loaded")
     _LOGGER.debug(
         "Configuration: fan=%s, humidity=%s, inputs=%s/%s",
