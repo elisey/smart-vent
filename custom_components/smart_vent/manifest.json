@@ -1,0 +1,10 @@
+{
+  "domain": "smart_vent",
+  "name": "Smart Ventilation Controller",
+  "version": "0.1.0",
+  "documentation": "https://github.com/elisey/smart-vent",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": [],
+  "iot_class": "local_polling"
+}

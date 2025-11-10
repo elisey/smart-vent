@@ -117,11 +117,27 @@ input_boolean:
     name: "Shelly Input 0 (Switch Position Bit 0)"
     initial: off
     icon: mdi:toggle-switch-off
-    
+
   shelly_input_1:
     name: "Shelly Input 1 (Switch Position Bit 1)"
     initial: off
     icon: mdi:toggle-switch-off
+
+  # Контроллеры для тестовых сценариев
+  simulate_high_humidity:
+    name: "Simulate Gradual Humidity Rise"
+    initial: off
+    icon: mdi:chart-line
+
+  quick_high_humidity:
+    name: "Quick Set: High Humidity (85%)"
+    initial: off
+    icon: mdi:water-alert
+
+  quick_normal_humidity:
+    name: "Quick Set: Normal Humidity (60%)"
+    initial: off
+    icon: mdi:water
 
 # ============================================================================
 # АВТОМАТИЗАЦИИ ДЛЯ ТЕСТОВЫХ СЦЕНАРИЕВ
@@ -186,23 +202,6 @@ automation:
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.quick_normal_humidity
-
-input_boolean:
-  # Контроллеры для тестовых сценариев
-  simulate_high_humidity:
-    name: "Simulate Gradual Humidity Rise"
-    initial: off
-    icon: mdi:chart-line
-    
-  quick_high_humidity:
-    name: "Quick Set: High Humidity (85%)"
-    initial: off
-    icon: mdi:water-alert
-    
-  quick_normal_humidity:
-    name: "Quick Set: Normal Humidity (60%)"
-    initial: off
-    icon: mdi:water
 
 # ============================================================================
 # СКРИПТЫ ДЛЯ БЫСТРОГО ТЕСТИРОВАНИЯ
@@ -274,14 +273,14 @@ script:
 # ============================================================================
 
 # Раскомментируй после создания компонента:
-# smart_vent:
-#   fan_entity: fan.real_fan
-#   humidity_sensor: sensor.temperature_humidity_sensor_9970_humidity
-#   input_0: binary_sensor.shelly_input_0
-#   input_1: binary_sensor.shelly_input_1
-#   speeds:
-#     low: 30
-#     mid: 52
-#     boost: 100
-#   check_interval: 20
-#   max_boosts_per_day: 5
+smart_vent:
+  fan_entity: fan.real_fan
+  humidity_sensor: sensor.temperature_humidity_sensor_9970_humidity
+  input_0: binary_sensor.shelly_input_0
+  input_1: binary_sensor.shelly_input_1
+  speeds:
+    low: 30
+    mid: 52
+    boost: 100
+  check_interval: 20
+  max_boosts_per_day: 5
