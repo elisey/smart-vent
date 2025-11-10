@@ -164,6 +164,76 @@ class SmartVentCoordinator(DataUpdateCoordinator):
             )
             return None
 
+    async def _set_fan_speed(self, percentage: int) -> None:
+        """Set the fan speed to a specific percentage.
+
+        Args:
+            percentage: Fan speed percentage (0-100)
+        """
+        # Check if fan entity exists
+        fan_state = self.hass.states.get(self.fan_entity)
+        if fan_state is None:
+            _LOGGER.error("Fan entity %s not found, cannot set speed", self.fan_entity)
+            return
+
+        # Check if fan is available
+        if fan_state.state in ("unavailable", "unknown"):
+            _LOGGER.warning(
+                "Fan entity %s is unavailable (state: %s), skipping speed change",
+                self.fan_entity,
+                fan_state.state,
+            )
+            return
+
+        # Call the fan.set_percentage service
+        try:
+            await self.hass.services.async_call(
+                "fan",
+                "set_percentage",
+                {
+                    "entity_id": self.fan_entity,
+                    "percentage": percentage,
+                },
+                blocking=True,
+            )
+            _LOGGER.info("Fan speed set to %d%%", percentage)
+        except Exception as err:
+            _LOGGER.error(
+                "Failed to set fan speed for %s to %d%%: %s",
+                self.fan_entity,
+                percentage,
+                err,
+            )
+
+    async def set_mode(self, mode: str) -> None:
+        """Set the ventilation mode and adjust fan speed accordingly.
+
+        Args:
+            mode: The mode to set ('low', 'mid', or 'boost')
+        """
+        # Validate mode
+        if mode not in ("low", "mid", "boost"):
+            _LOGGER.error("Invalid mode '%s', must be one of: low, mid, boost", mode)
+            return
+
+        # Check if mode actually changed
+        if mode == self.current_mode:
+            _LOGGER.debug("Mode already set to '%s', no change needed", mode)
+            return
+
+        # Update current mode
+        old_mode = self.current_mode
+        self.current_mode = mode
+
+        # Get speed for the new mode
+        speed = self.speeds[mode]
+        self.target_speed = speed
+
+        # Set the fan speed
+        await self._set_fan_speed(speed)
+
+        _LOGGER.info("Mode changed from '%s' to '%s' (speed: %d%%)", old_mode, mode, speed)
+
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from the system.
 
@@ -177,8 +247,9 @@ class SmartVentCoordinator(DataUpdateCoordinator):
             # Read current humidity
             humidity = self._get_humidity()
 
-            # For now, just track the mode (fan control will be added in later stages)
-            self.current_mode = switch_mode
+            # If switch mode changed, update the mode and fan speed
+            if switch_mode != self.current_mode:
+                await self.set_mode(switch_mode)
 
             data = {
                 "current_mode": self.current_mode,

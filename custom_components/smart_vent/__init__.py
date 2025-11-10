@@ -3,7 +3,10 @@ import logging
 
 import voluptuous as vol
 
-from homeassistant.core import HomeAssistant
+from datetime import timedelta
+
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
@@ -74,8 +77,37 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     # Store coordinator in hass.data
     hass.data[DOMAIN] = coordinator
 
-    # Perform first refresh of coordinator data
+    # Perform first refresh of coordinator data and start polling
     await coordinator.async_refresh()
+
+    # Set up state change listeners for input entities
+    @callback
+    def async_state_changed_listener(event):
+        """Handle state changes of monitored entities."""
+        entity_id = event.data.get("entity_id")
+        _LOGGER.debug("State change detected for %s, triggering immediate refresh", entity_id)
+        # Use async_refresh() instead of async_request_refresh() to bypass debounce
+        hass.async_create_task(coordinator.async_refresh())
+
+    # Listen for changes to input sensors
+    async_track_state_change_event(
+        hass,
+        [conf["input_0"], conf["input_1"], conf["humidity_sensor"]],
+        async_state_changed_listener,
+    )
+
+    # Set up periodic polling for checking conditions (auto-boost timers, etc.)
+    @callback
+    def async_periodic_update(now):
+        """Periodic update callback."""
+        _LOGGER.debug("Periodic update triggered (every %d seconds)", conf["check_interval"])
+        hass.async_create_task(coordinator.async_refresh())
+
+    async_track_time_interval(
+        hass,
+        async_periodic_update,
+        timedelta(seconds=conf["check_interval"]),
+    )
 
     _LOGGER.info("Smart Ventilation Controller component loaded")
     _LOGGER.debug(
