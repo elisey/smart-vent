@@ -141,6 +141,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     hass.services.async_register(DOMAIN, "set_mode", handle_set_mode)
 
+    async def handle_force_boost(call):
+        """Handle the force_boost service call."""
+        _LOGGER.info("Service call: force_boost")
+        await coordinator.force_boost()
+
+    hass.services.async_register(DOMAIN, "force_boost", handle_force_boost)
+
     _LOGGER.info("Smart Ventilation Controller component loaded")
     _LOGGER.debug(
         "Configuration: fan=%s, humidity=%s, inputs=%s/%s",

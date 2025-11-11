@@ -15,3 +15,7 @@ set_mode:
               value: "mid"
             - label: "Boost"
               value: "boost"
+
+force_boost:
+  name: Force boost mode
+  description: Manually trigger boost mode for configured duration, returns to previous mode after timeout (bypasses daily limit)

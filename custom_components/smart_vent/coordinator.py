@@ -48,11 +48,16 @@ class SmartVentCoordinator(DataUpdateCoordinator):
         self.current_mode = "low"
         self.target_speed = speeds["low"]
 
-        # Auto-boost tracking (will be used in later stages)
+        # Auto-boost tracking
         self.auto_boost_active = False
         self.auto_boost_end_time = None
         self.auto_boost_count_today = 0
         self.last_reset_date = None
+
+        # Manual boost tracking
+        self.manual_boost_active = False
+        self.mode_before_boost = None
+        self.last_switch_mode = None
 
         _LOGGER.info(
             "SmartVentCoordinator initialized with fan=%s, humidity=%s, inputs=%s/%s",
@@ -210,6 +215,7 @@ class SmartVentCoordinator(DataUpdateCoordinator):
     async def _activate_auto_boost(self) -> None:
         """Activate automatic boost mode."""
         self.auto_boost_active = True
+        self.manual_boost_active = False
         self.auto_boost_end_time = datetime.now() + timedelta(minutes=self.auto_boost_duration)
         self.auto_boost_count_today += 1
 
@@ -227,29 +233,75 @@ class SmartVentCoordinator(DataUpdateCoordinator):
             end_time_str,
         )
 
-    def _check_auto_boost_timeout(self) -> bool:
+    async def force_boost(self) -> None:
+        """Force boost mode activation via service call.
+
+        Does not check daily limit and does not increment counter.
+        Returns to previous mode after timeout.
+        """
+        # Save current mode to return to after timeout
+        self.mode_before_boost = self.current_mode
+
+        # Cancel any existing boost
+        self._cancel_auto_boost()
+
+        # Activate manual boost
+        self.auto_boost_active = True
+        self.manual_boost_active = True
+        self.auto_boost_end_time = datetime.now() + timedelta(minutes=self.auto_boost_duration)
+
+        # Set fan to boost speed
+        await self._set_fan_speed(self.speeds["boost"])
+        self.target_speed = self.speeds["boost"]
+        self.current_mode = "boost"
+
+        end_time_str = self.auto_boost_end_time.strftime("%H:%M")
+        _LOGGER.info(
+            "Force boost activated via service (duration: %d min, will return to '%s', will end at %s)",
+            self.auto_boost_duration,
+            self.mode_before_boost,
+            end_time_str,
+        )
+
+    def _check_auto_boost_timeout(self) -> str | None:
         """Check if auto-boost has timed out.
 
         Returns:
-            True if auto-boost just timed out, False otherwise
+            Mode to return to if timeout occurred, None otherwise
         """
         if not self.auto_boost_active:
-            return False
+            return None
 
         if datetime.now() >= self.auto_boost_end_time:
-            self.auto_boost_active = False
-            self.auto_boost_end_time = None
-            _LOGGER.info("Auto-boost timeout reached")
-            return True
+            # Determine which mode to return to
+            if self.manual_boost_active:
+                # Manual boost - return to saved mode
+                return_mode = self.mode_before_boost or "mid"
+                _LOGGER.info("Manual boost timeout reached, returning to '%s'", return_mode)
+            else:
+                # Automatic boost - return to mid
+                return_mode = "mid"
+                _LOGGER.info("Auto-boost timeout reached, returning to 'mid'")
 
-        return False
+            # Clear boost flags
+            self.auto_boost_active = False
+            self.manual_boost_active = False
+            self.auto_boost_end_time = None
+            self.mode_before_boost = None
+
+            return return_mode
+
+        return None
 
     def _cancel_auto_boost(self) -> None:
-        """Cancel active auto-boost."""
+        """Cancel active auto-boost or manual boost."""
         if self.auto_boost_active:
+            boost_type = "manual" if self.manual_boost_active else "auto"
             self.auto_boost_active = False
+            self.manual_boost_active = False
             self.auto_boost_end_time = None
-            _LOGGER.info("Auto-boost cancelled")
+            self.mode_before_boost = None
+            _LOGGER.info("%s boost cancelled", boost_type.capitalize())
 
     async def _set_fan_speed(self, percentage: int) -> None:
         """Set the fan speed to a specific percentage.
@@ -338,18 +390,40 @@ class SmartVentCoordinator(DataUpdateCoordinator):
             switch_mode = self._determine_switch_mode()
             humidity = self._get_humidity()
 
-            # Check if auto-boost has timed out
-            boost_timed_out = self._check_auto_boost_timeout()
+            # Check if auto-boost has timed out (returns mode to restore, or None)
+            timeout_return_mode = self._check_auto_boost_timeout()
 
-            # Determine effective mode based on priorities
-            if switch_mode == "low":
-                # Priority 1: Low mode always cancels auto-boost
+            # Detect switch position changes - cancel manual boost if switch moved
+            if self.manual_boost_active and self.last_switch_mode and switch_mode != self.last_switch_mode:
+                _LOGGER.info("Switch position changed from '%s' to '%s', cancelling manual boost",
+                           self.last_switch_mode, switch_mode)
                 self._cancel_auto_boost()
+
+            # Update last known switch position
+            self.last_switch_mode = switch_mode
+
+            # Check if manual boost is active - if so, maintain it regardless of switch
+            if self.manual_boost_active:
+                # Manual boost stays active - only timeout or explicit switch CHANGE cancels it
+                _LOGGER.debug("Manual boost active, maintaining boost speed")
+                # Don't follow switch position while manual boost is active
+
+            # Handle timeout - if boost just timed out, return to saved mode
+            elif timeout_return_mode:
+                # Boost timed out, return to the saved mode
+                if self.current_mode != timeout_return_mode:
+                    await self.set_mode(timeout_return_mode)
+
+            # Otherwise, follow switch position
+            elif switch_mode == "low":
+                # Priority 1: Low mode cancels auto-boost (not manual boost)
+                if self.auto_boost_active and not self.manual_boost_active:
+                    self._cancel_auto_boost()
                 if self.current_mode != "low":
                     await self.set_mode("low")
 
             elif switch_mode == "boost":
-                # Priority 2: Manual boost cancels auto-boost
+                # Priority 2: Manual boost on switch cancels any boost
                 self._cancel_auto_boost()
                 if self.current_mode != "boost":
                     await self.set_mode("boost")
@@ -358,12 +432,7 @@ class SmartVentCoordinator(DataUpdateCoordinator):
                 # Priority 3: Mid mode - handle auto-boost logic
                 if self.auto_boost_active:
                     # Auto-boost is still active, keep boost speed
-                    # (timeout check already happened above)
                     _LOGGER.debug("Auto-boost active, maintaining boost speed")
-                elif boost_timed_out:
-                    # Auto-boost just timed out, return to mid
-                    _LOGGER.debug("Auto-boost timed out, returning to mid")
-                    await self.set_mode("mid")
                 elif self._should_trigger_auto_boost():
                     # Conditions met for new auto-boost
                     await self._activate_auto_boost()
