@@ -20,3 +20,6 @@ DEFAULT_CHECK_INTERVAL = 20
 
 # Default maximum number of automatic boost activations per day
 DEFAULT_MAX_BOOSTS_PER_DAY = 5
+
+# Default auto-boost duration in minutes
+DEFAULT_AUTO_BOOST_DURATION = 20

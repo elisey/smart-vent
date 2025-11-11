@@ -15,6 +15,7 @@ from .const import (
     DOMAIN,
     DEFAULT_CHECK_INTERVAL,
     DEFAULT_MAX_BOOSTS_PER_DAY,
+    DEFAULT_AUTO_BOOST_DURATION,
     DEFAULT_SPEEDS,
 )
 from .coordinator import SmartVentCoordinator
@@ -49,6 +50,9 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(
                     "max_boosts_per_day", default=DEFAULT_MAX_BOOSTS_PER_DAY
                 ): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+                vol.Optional(
+                    "auto_boost_duration", default=DEFAULT_AUTO_BOOST_DURATION
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=120)),
             }
         )
     },
@@ -73,6 +77,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         speeds=conf["speeds"],
         check_interval=conf["check_interval"],
         max_boosts_per_day=conf["max_boosts_per_day"],
+        auto_boost_duration=conf["auto_boost_duration"],
     )
 
     # Store coordinator in hass.data

@@ -1,5 +1,5 @@
 """DataUpdateCoordinator for Smart Ventilation Controller."""
-from datetime import timedelta
+from datetime import datetime, timedelta
 import logging
 from typing import Any
 
@@ -24,6 +24,7 @@ class SmartVentCoordinator(DataUpdateCoordinator):
         speeds: dict[str, int],
         check_interval: int,
         max_boosts_per_day: int,
+        auto_boost_duration: int,
     ) -> None:
         """Initialize the coordinator."""
         super().__init__(
@@ -41,6 +42,7 @@ class SmartVentCoordinator(DataUpdateCoordinator):
         self.speeds = speeds
         self.check_interval = check_interval
         self.max_boosts_per_day = max_boosts_per_day
+        self.auto_boost_duration = auto_boost_duration
 
         # Initialize state tracking
         self.current_mode = "low"
@@ -164,6 +166,91 @@ class SmartVentCoordinator(DataUpdateCoordinator):
             )
             return None
 
+    def _reset_daily_counter_if_needed(self) -> None:
+        """Reset the auto-boost counter if a new day has started."""
+        current_date = datetime.now().date()
+
+        if self.last_reset_date is None or current_date != self.last_reset_date:
+            self.auto_boost_count_today = 0
+            self.last_reset_date = current_date
+            _LOGGER.info("Daily auto-boost counter reset")
+
+    def _should_trigger_auto_boost(self) -> bool:
+        """Check if conditions are met to trigger automatic boost.
+
+        Returns:
+            True if auto-boost should be activated, False otherwise
+        """
+        # Already active
+        if self.auto_boost_active:
+            return False
+
+        # Check humidity
+        humidity = self._get_humidity()
+        if humidity is None:
+            _LOGGER.debug("Auto-boost check: humidity unavailable")
+            return False
+
+        if humidity <= 80:
+            _LOGGER.debug("Auto-boost check: humidity %.1f%% <= 80%%", humidity)
+            return False
+
+        # Check daily limit
+        if self.auto_boost_count_today >= self.max_boosts_per_day:
+            _LOGGER.debug(
+                "Auto-boost check: daily limit reached (%d/%d)",
+                self.auto_boost_count_today,
+                self.max_boosts_per_day,
+            )
+            return False
+
+        _LOGGER.debug("Auto-boost check: all conditions met (humidity: %.1f%%)", humidity)
+        return True
+
+    async def _activate_auto_boost(self) -> None:
+        """Activate automatic boost mode."""
+        self.auto_boost_active = True
+        self.auto_boost_end_time = datetime.now() + timedelta(minutes=self.auto_boost_duration)
+        self.auto_boost_count_today += 1
+
+        # Set fan to boost speed
+        await self._set_fan_speed(self.speeds["boost"])
+        self.target_speed = self.speeds["boost"]
+        self.current_mode = "boost"
+
+        end_time_str = self.auto_boost_end_time.strftime("%H:%M")
+        _LOGGER.info(
+            "Auto-boost activated (%d/%d today), duration: %d min, will end at %s",
+            self.auto_boost_count_today,
+            self.max_boosts_per_day,
+            self.auto_boost_duration,
+            end_time_str,
+        )
+
+    def _check_auto_boost_timeout(self) -> bool:
+        """Check if auto-boost has timed out.
+
+        Returns:
+            True if auto-boost just timed out, False otherwise
+        """
+        if not self.auto_boost_active:
+            return False
+
+        if datetime.now() >= self.auto_boost_end_time:
+            self.auto_boost_active = False
+            self.auto_boost_end_time = None
+            _LOGGER.info("Auto-boost timeout reached")
+            return True
+
+        return False
+
+    def _cancel_auto_boost(self) -> None:
+        """Cancel active auto-boost."""
+        if self.auto_boost_active:
+            self.auto_boost_active = False
+            self.auto_boost_end_time = None
+            _LOGGER.info("Auto-boost cancelled")
+
     async def _set_fan_speed(self, percentage: int) -> None:
         """Set the fan speed to a specific percentage.
 
@@ -211,6 +298,9 @@ class SmartVentCoordinator(DataUpdateCoordinator):
         Args:
             mode: The mode to set ('low', 'mid', or 'boost')
         """
+        # Cancel any active auto-boost (manual mode change takes priority)
+        self._cancel_auto_boost()
+
         # Validate mode
         if mode not in ("low", "mid", "boost"):
             _LOGGER.error("Invalid mode '%s', must be one of: low, mid, boost", mode)
@@ -241,15 +331,45 @@ class SmartVentCoordinator(DataUpdateCoordinator):
         at the interval specified in update_interval.
         """
         try:
-            # Read the current switch mode
-            switch_mode = self._determine_switch_mode()
+            # Reset daily counter if needed (new day)
+            self._reset_daily_counter_if_needed()
 
-            # Read current humidity
+            # Read inputs
+            switch_mode = self._determine_switch_mode()
             humidity = self._get_humidity()
 
-            # If switch mode changed, update the mode and fan speed
-            if switch_mode != self.current_mode:
-                await self.set_mode(switch_mode)
+            # Check if auto-boost has timed out
+            boost_timed_out = self._check_auto_boost_timeout()
+
+            # Determine effective mode based on priorities
+            if switch_mode == "low":
+                # Priority 1: Low mode always cancels auto-boost
+                self._cancel_auto_boost()
+                if self.current_mode != "low":
+                    await self.set_mode("low")
+
+            elif switch_mode == "boost":
+                # Priority 2: Manual boost cancels auto-boost
+                self._cancel_auto_boost()
+                if self.current_mode != "boost":
+                    await self.set_mode("boost")
+
+            elif switch_mode == "mid":
+                # Priority 3: Mid mode - handle auto-boost logic
+                if self.auto_boost_active:
+                    # Auto-boost is still active, keep boost speed
+                    # (timeout check already happened above)
+                    _LOGGER.debug("Auto-boost active, maintaining boost speed")
+                elif boost_timed_out:
+                    # Auto-boost just timed out, return to mid
+                    _LOGGER.debug("Auto-boost timed out, returning to mid")
+                    await self.set_mode("mid")
+                elif self._should_trigger_auto_boost():
+                    # Conditions met for new auto-boost
+                    await self._activate_auto_boost()
+                elif self.current_mode != "mid":
+                    # Normal mid operation
+                    await self.set_mode("mid")
 
             data = {
                 "current_mode": self.current_mode,
