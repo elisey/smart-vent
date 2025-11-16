@@ -126,6 +126,17 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         )
     )
 
+    # Load the binary_sensor platform
+    hass.async_create_task(
+        async_load_platform(
+            hass,
+            "binary_sensor",
+            DOMAIN,
+            {"coordinator": coordinator},
+            config,
+        )
+    )
+
     # Register services
     async def handle_set_mode(call):
         """Handle the set_mode service call."""
