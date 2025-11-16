@@ -125,7 +125,8 @@ class SmartVentCoordinator(DataUpdateCoordinator):
             mode = "low"
         else:
             # Unexpected state values (not 'on' or 'off')
-            _LOGGER.error(
+            # This is normal during HA startup when entities haven't initialized yet
+            _LOGGER.warning(
                 "Unexpected switch state values: input_0=%s, input_1=%s. Defaulting to low mode.",
                 state_0,
                 state_1,
