@@ -1,368 +1,273 @@
-# Smart Vent Development Environment
+# Smart Ventilation Controller for Home Assistant
 
-Полностью готовое окружение для разработки и тестирования компонента Smart Ventilation Controller.
+A Home Assistant custom component that provides intelligent ventilation control with automatic boost functionality based on humidity levels.
 
-## 📦 Что включено
+## Features
 
-- **Home Assistant в Docker** - изолированная среда для разработки
-- **Эмулированные устройства** - датчик влажности, Shelly входы, вентилятор
-- **Тестовые скрипты** - для быстрого переключения режимов
-- **Автоматизации** - симуляция различных сценариев
-- **Детальное логирование** - для отладки компонента
+- **Three Operating Modes**: Low, Mid, and Boost controlled by a 3-position physical switch
+- **Automatic Boost**: Activates when humidity exceeds 80% in mid mode
+- **Manual Override**: Full control via physical switch or Home Assistant services
+- **Daily Limits**: Configurable maximum boost activations per day
+- **Real-time Updates**: Instant response to switch and humidity changes
 
-## 🚀 Быстрый старт
+## Documentation
 
-### 1. Запуск Home Assistant
+For complete installation and configuration instructions, see the [Component Documentation](custom_components/smart_vent/README.md).
+
+### Quick Links
+
+- **[Installation Guide](custom_components/smart_vent/README.md#installation)** - HACS and manual installation
+- **[Configuration](custom_components/smart_vent/README.md#configuration)** - Setup in configuration.yaml
+- **[Automation Examples](custom_components/smart_vent/EXAMPLES.md)** - Ready-to-use automations
+- **[Troubleshooting](custom_components/smart_vent/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[FAQ](custom_components/smart_vent/FAQ.md)** - Frequently asked questions
+
+## Quick Start
+
+1. Install via HACS or manually copy to `custom_components/smart_vent`
+2. Add configuration to `configuration.yaml`:
+
+```yaml
+smart_vent:
+  # Use either a fan entity or a light entity (for Shelly Dimmers)
+  fan_entity: fan.your_fan  # or light.your_shelly_dimmer
+  humidity_sensor: sensor.your_humidity
+  input_0: binary_sensor.switch_input_0
+  input_1: binary_sensor.switch_input_1
+```
+
+3. Restart Home Assistant
+4. Configure your 3-position switch hardware
+
+**Note**: The component supports both `fan.*` entities and `light.*` entities. Light entities are commonly used with Shelly Dimmers controlling fans via 0-10V or brightness control.
+
+See the [full documentation](custom_components/smart_vent/README.md) for detailed setup instructions.
+
+---
+
+## Development Environment
+
+This repository includes a complete Docker-based development environment for testing the Smart Ventilation Controller component.
+
+### What's Included
+
+- **Home Assistant in Docker** - Isolated development environment
+- **Emulated Devices** - Humidity sensor, Shelly inputs, fan
+- **Test Scripts** - Quick mode switching
+- **Automations** - Various scenario simulations
+- **Detailed Logging** - Component debugging
+
+### Quick Start for Developers
 
 ```bash
-# Находясь в папке ha-dev-environment
+# Start Home Assistant
 docker-compose up -d
 
-# Проверка статуса
-docker-compose ps
-
-# Просмотр логов
-docker-compose logs -f
-```
-
-### 2. Первая настройка
-
-1. Открой браузер: http://localhost:8123
-2. Пройди первичную настройку HA:
-   - Создай аккаунт администратора
-   - Укажи имя дома: "Smart Vent Dev"
-   - Остальное можно пропустить
-
-3. После настройки перезапусти контейнер:
-```bash
-docker-compose restart
-```
-
-### 3. Проверка тестовых устройств
-
-В интерфейсе HA должны появиться:
-
-**Sensors:**
-- `sensor.temperature_humidity_sensor_9970_humidity` - датчик влажности
-
-**Binary Sensors:**
-- `binary_sensor.shelly_input_0` - вход 0 Shelly
-- `binary_sensor.shelly_input_1` - вход 1 Shelly
-
-**Fan:**
-- `fan.real_fan` - эмулированный вентилятор
-
-**Helpers:**
-- `input_number.test_humidity` - контроль влажности
-- `input_number.fan_speed` - текущая скорость вентилятора
-- `input_boolean.shelly_input_0` - контроль входа 0
-- `input_boolean.shelly_input_1` - контроль входа 1
-
-## 🔧 Разработка компонента
-
-### Структура проекта
-
-```
-ha-dev-environment/
-├── docker-compose.yml
-├── config/
-│   ├── configuration.yaml
-│   └── (другие файлы HA)
-└── custom_components/
-    └── smart_vent/          ← Твой компонент здесь
-        ├── __init__.py
-        ├── manifest.json
-        ├── const.py
-        ├── coordinator.py
-        ├── fan.py
-        └── ...
-```
-
-### Workflow разработки
-
-1. **Редактируй код:**
-```bash
-# Создай файлы компонента в custom_components/smart_vent/
-nano custom_components/smart_vent/__init__.py
-```
-
-2. **Перезапусти HA:**
-```bash
-docker-compose restart
-
-# Или только reload конфига (быстрее, но не всегда работает):
-# Developer Tools > YAML > Check Configuration
-# Developer Tools > YAML > Restart
-```
-
-3. **Смотри логи:**
-```bash
-# Все логи
+# View logs
 docker-compose logs -f
 
-# Только твоего компонента
-docker-compose logs -f | grep smart_vent
-
-# Или в UI: Settings > System > Logs
+# Access UI
+open http://localhost:8123
 ```
 
-4. **Проверь состояние:**
-```bash
-# Developer Tools > States
-# Найди entity fan.smart_vent и посмотри его атрибуты
-```
+### Test Devices Available
 
-## 🧪 Тестовые сценарии
+After initial setup, you'll have access to:
 
-### Сценарий 1: Тест ручного управления переключателем
+- `sensor.temperature_humidity_sensor_9970_humidity` - Humidity sensor
+- `binary_sensor.shelly_input_0` - Switch input 0
+- `binary_sensor.shelly_input_1` - Switch input 1
+- `fan.real_fan` - Emulated fan entity (for backward compatibility testing)
+- `light.shelly_dimmer_fan` - Emulated light entity (for Shelly Dimmer testing)
+- `input_number.test_humidity` - Manual humidity control
+- `input_number.fan_speed` - Fan entity speed state
+- `input_number.light_fan_speed` - Light entity speed state
+- `input_boolean.shelly_input_0/1` - Manual switch control
 
-**Через UI:**
-1. Settings > Automations & Scenes > Scripts
-2. Запусти скрипт "Set Switch to LOW"
-3. Проверь, что вентилятор на 30%
-4. Запусти "Set Switch to MID" → 52%
-5. Запусти "Set Switch to BOOST" → 100%
+### Development Workflow
 
-**Через Developer Tools:**
+1. **Edit component code** in `custom_components/smart_vent/`
+2. **Restart Home Assistant**: `docker-compose restart`
+3. **Check logs**: `docker-compose logs -f | grep smart_vent`
+4. **Test scenarios** using provided scripts and automations
+
+### Test Scenarios
+
+#### Manual Switch Control
 ```yaml
+# Set to LOW mode
 service: script.set_switch_low
-```
 
-### Сценарий 2: Тест автоматического boost
-
-1. Установи переключатель в MID:
-```yaml
+# Set to MID mode
 service: script.set_switch_mid
+
+# Set to BOOST mode
+service: script.set_switch_boost
 ```
 
-2. Установи высокую влажность:
+#### Automatic Boost Test
 ```yaml
+# 1. Set switch to MID
+service: script.set_switch_mid
+
+# 2. Trigger high humidity
 service: input_boolean.turn_on
 target:
   entity_id: input_boolean.quick_high_humidity
 ```
 
-3. Подожди 20 секунд (check_interval)
-4. Проверь, что вентилятор перешёл на 100% (boost)
-5. Проверь `binary_sensor.smart_vent_auto_boost` = on
+Wait 5 seconds (configured check_interval) and verify:
+- Fan speed increases to 100%
+- `binary_sensor.smart_vent_auto_boost` turns on
 
-### Сценарий 3: Симуляция постепенного роста влажности
-
-1. Установи переключатель в MID
-2. Включи симуляцию:
+#### Simulate Gradual Humidity Rise
 ```yaml
 service: input_boolean.turn_on
 target:
   entity_id: input_boolean.simulate_high_humidity
 ```
-3. Наблюдай, как влажность растёт каждые 2 секунды
-4. Когда достигнет >80%, должен сработать auto-boost
 
-### Сценарий 4: Тест недопустимого состояния
+Watch humidity increase every 2 seconds until auto-boost triggers at >80%.
 
-```yaml
-service: script.set_switch_invalid
-```
-- Компонент должен переключиться в LOW
-- В логах должна быть ERROR запись
-
-### Сценарий 5: Тест отмены auto-boost
-
-1. Активируй auto-boost (сценарий 2)
-2. Переключи в LOW:
-```yaml
-service: script.set_switch_low
-```
-3. Auto-boost должен отмениться немедленно
-
-## 📊 Мониторинг и отладка
-
-### Просмотр логов компонента
+### Monitoring and Debugging
 
 ```bash
-# В реальном времени
-docker-compose logs -f | grep -i "smart_vent\|custom_components"
+# Real-time component logs
+docker-compose logs -f | grep -i "smart_vent"
 
-# Последние 100 строк
+# Last 100 log lines
 docker-compose logs --tail=100 | grep smart_vent
+
+# Check configuration validity
+docker exec ha-smart-vent-dev hass --script check_config -c /config
 ```
 
-### Проверка состояния в UI
-
-**Developer Tools > States:**
-- Найди все entity связанные со smart_vent
-- Проверь их атрибуты и состояния
-
-**Developer Tools > Services:**
-- Тестируй сервисы напрямую:
-  - `smart_vent.set_mode`
-  - `smart_vent.set_speed`
-  - `smart_vent.force_boost`
-
-### Debugging в коде
-
-Добавь в код компонента:
-```python
-import logging
-_LOGGER = logging.getLogger(__name__)
-
-# Используй в коде
-_LOGGER.debug("Debug message")
-_LOGGER.info("Info message")
-_LOGGER.warning("Warning message")
-_LOGGER.error("Error message")
-```
-
-## 🎛️ Контроль тестовых устройств
-
-### Через UI (Lovelace)
-
-Создай тестовую панель:
-
-```yaml
-# В UI: Settings > Dashboards > + Add Dashboard
-# Добавь карточки:
-
-type: entities
-title: Test Controls
-entities:
-  - entity: input_number.test_humidity
-  - entity: input_boolean.shelly_input_0
-  - entity: input_boolean.shelly_input_1
-  - entity: fan.real_fan
-```
-
-### Через Developer Tools > States
-
-Можешь вручную изменить любое состояние:
-1. Developer Tools > States
-2. Найди нужную entity
-3. Кликни на неё
-4. Измени state или атрибуты
-
-## 🔄 Полезные команды Docker
+### Docker Commands
 
 ```bash
-# Остановить HA
+# Stop Home Assistant
 docker-compose down
 
-# Остановить и удалить все данные (полный сброс)
+# Restart
+docker-compose restart
+
+# Full reset (removes all data)
 docker-compose down -v
 rm -rf config/*
 
-# Перезапустить
-docker-compose restart
-
-# Пересобрать и запустить заново
+# Rebuild and start
 docker-compose up -d --force-recreate
 
-# Зайти внутрь контейнера
+# Shell access
 docker exec -it ha-smart-vent-dev bash
-
-# Просмотр ресурсов
-docker stats ha-smart-vent-dev
 ```
 
-## 📝 Подключение реальных устройств
+### Connecting Real Hardware
 
-Когда будешь готов тестировать с реальным оборудованием:
+When ready to test with actual devices:
 
-### 1. Подключение Shelly Dimmer
+1. **Add Shelly integration** via Home Assistant UI
+2. **Add Xiaomi BLE** - auto-discovered with bluetooth enabled
+3. **Update configuration** to use real entity IDs:
 
-В `configuration.yaml` замени template fan на:
-
-```yaml
-# Добавь интеграцию Shelly через UI:
-# Settings > Devices & Services > Add Integration > Shelly
-
-# Или через YAML (если у тебя Shelly Gen1):
-shelly:
-  host: 192.168.1.XXX  # IP твоего Shelly
-```
-
-### 2. Подключение Xiaomi BLE
-
-```yaml
-# В конфиге уже должен быть bluetooth:
-bluetooth:
-
-# Интеграция Xiaomi BLE добавляется автоматически
-# Settings > Devices & Services > найди Xiaomi устройства
-```
-
-### 3. Обновление конфигурации smart_vent
-
+**Option A: Using Shelly Dimmer Light Entity (Recommended for 0-10V control)**
 ```yaml
 smart_vent:
-  fan_entity: fan.shelly_dimmer_XXX  # Реальный Shelly
-  humidity_sensor: sensor.XXXX_humidity  # Реальный датчик
-  input_0: binary_sensor.shelly_dimmer_XXX_input_0
-  input_1: binary_sensor.shelly_dimmer_XXX_input_1
+  # Use the light entity directly from Shelly Dimmer
+  fan_entity: light.shelly0110dimg3_e4b3233d0e54_light_0
+  humidity_sensor: sensor.temperature_humidity_sensor_9970_humidity
+  input_0: binary_sensor.shelly0110dimg3_e4b3233d0e54_input_0
+  input_1: binary_sensor.shelly0110dimg3_e4b3233d0e54_input_1
   speeds:
     low: 30
     mid: 52
     boost: 100
   check_interval: 20
+  auto_boost_duration: 20
   max_boosts_per_day: 5
 ```
 
-## 🐛 Решение проблем
+**Option B: Using Template Fan Entity (Alternative)**
+```yaml
+# If you prefer using a fan entity wrapper
+smart_vent:
+  fan_entity: fan.house_extractor  # Template fan that wraps the light
+  humidity_sensor: sensor.temperature_humidity_sensor_9970_humidity
+  input_0: binary_sensor.shelly_input_0
+  input_1: binary_sensor.shelly_input_1
+  speeds:
+    low: 30
+    mid: 52
+    boost: 100
+  check_interval: 20
+  auto_boost_duration: 20
+  max_boosts_per_day: 5
+```
 
-### HA не запускается
+### Troubleshooting Development Environment
 
+**HA won't start:**
 ```bash
-# Проверь логи
 docker-compose logs
-
-# Проверь конфиг
-docker exec ha-smart-vent-dev hass --script check_config -c /config
-
-# Полный перезапуск
-docker-compose down
-docker-compose up -d
+docker-compose down && docker-compose up -d
 ```
 
-### Компонент не загружается
+**Component not loading:**
+- Check file structure in `custom_components/smart_vent/`
+- Verify `manifest.json` is valid JSON
+- Check logs: `docker-compose logs | grep -i error`
+- Validate config: Developer Tools > YAML > Check Configuration
 
-1. Проверь структуру файлов в `custom_components/smart_vent/`
-2. Проверь `manifest.json` - должен быть валидный JSON
-3. Смотри логи: `docker-compose logs | grep -i error`
-4. Проверь: Developer Tools > YAML > Check Configuration
-
-### Изменения в коде не применяются
-
+**Code changes not applying:**
 ```bash
-# Полная перезагрузка HA
 docker-compose restart
-
-# Или через UI:
-# Developer Tools > YAML > Restart (выбери "Restart Home Assistant")
+# Or via UI: Developer Tools > YAML > Restart Home Assistant
 ```
 
-### Port 8123 занят
-
+**Port 8123 occupied:**
 ```bash
-# Найди что занимает порт
 sudo lsof -i :8123
-
-# Останови конфликтующий процесс или измени порт в docker-compose.yml
+# Stop conflicting process or change port in docker-compose.yml
 ```
 
-## 📚 Полезные ссылки
+## Project Structure
 
-- [Home Assistant Developer Docs](https://developers.home-assistant.io/)
-- [Integration Development](https://developers.home-assistant.io/docs/creating_integration)
-- [Template Platform](https://www.home-assistant.io/integrations/template/)
-- [Logger Component](https://www.home-assistant.io/integrations/logger/)
+```
+ha-dev/
+├── custom_components/
+│   └── smart_vent/          # Component code
+│       ├── __init__.py
+│       ├── coordinator.py
+│       ├── fan.py
+│       ├── binary_sensor.py
+│       ├── const.py
+│       ├── manifest.json
+│       ├── services.yaml
+│       ├── README.md        # User documentation
+│       ├── EXAMPLES.md      # Automation examples
+│       ├── TROUBLESHOOTING.md
+│       └── FAQ.md
+├── config/                  # Home Assistant config
+│   └── configuration.yaml
+├── docs/                    # Development docs
+│   ├── DESIGN.md           # Implementation plan
+│   ├── DEPLOYMENT.md
+│   └── TEST_SCENARIOS.md
+├── docker-compose.yml       # Development environment
+└── README.md               # This file
+```
 
-## ✅ Чеклист перед началом разработки
+## Resources
 
-- [ ] Docker и docker-compose установлены
-- [ ] Запущен `docker-compose up -d`
-- [ ] HA доступен на http://localhost:8123
-- [ ] Пройдена первичная настройка
-- [ ] Видны тестовые устройства в UI
-- [ ] Папка `custom_components/smart_vent/` создана
-- [ ] Логи показывают успешный запуск
+- **[Home Assistant Developer Docs](https://developers.home-assistant.io/)**
+- **[Integration Development Guide](https://developers.home-assistant.io/docs/creating_integration)**
+- **[Template Platform](https://www.home-assistant.io/integrations/template/)**
+- **[Logger Component](https://www.home-assistant.io/integrations/logger/)**
 
-Готов к разработке! 🚀
+## License
+
+MIT License - see LICENSE file for details
+
+## Support
+
+For bug reports and feature requests, please open an issue on [GitHub](https://github.com/elisey/smart-vent/issues).

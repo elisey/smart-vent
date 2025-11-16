@@ -307,6 +307,9 @@ class SmartVentCoordinator(DataUpdateCoordinator):
     async def _set_fan_speed(self, percentage: int) -> None:
         """Set the fan speed to a specific percentage.
 
+        Supports both fan entities (using fan.set_percentage) and light entities
+        (using light.turn_on with brightness_pct) for Shelly Dimmers.
+
         Args:
             percentage: Fan speed percentage (0-100)
         """
@@ -325,21 +328,39 @@ class SmartVentCoordinator(DataUpdateCoordinator):
             )
             return
 
-        # Call the fan.set_percentage service
+        # Determine entity type and call appropriate service
+        is_light_entity = self.fan_entity.startswith("light.")
+
+        if is_light_entity:
+            # For light entities (Shelly Dimmers), use light.turn_on with brightness_pct
+            service_domain = "light"
+            service_name = "turn_on"
+            service_data = {
+                "entity_id": self.fan_entity,
+                "brightness_pct": percentage,
+            }
+        else:
+            # For fan entities, use fan.set_percentage
+            service_domain = "fan"
+            service_name = "set_percentage"
+            service_data = {
+                "entity_id": self.fan_entity,
+                "percentage": percentage,
+            }
+
+        # Call the appropriate service
         try:
             await self.hass.services.async_call(
-                "fan",
-                "set_percentage",
-                {
-                    "entity_id": self.fan_entity,
-                    "percentage": percentage,
-                },
+                service_domain,
+                service_name,
+                service_data,
                 blocking=True,
             )
-            _LOGGER.info("Fan speed set to %d%%", percentage)
+            entity_type = "Light" if is_light_entity else "Fan"
+            _LOGGER.info("%s speed set to %d%%", entity_type, percentage)
         except Exception as err:
             _LOGGER.error(
-                "Failed to set fan speed for %s to %d%%: %s",
+                "Failed to set speed for %s to %d%%: %s",
                 self.fan_entity,
                 percentage,
                 err,

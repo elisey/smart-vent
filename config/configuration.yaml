@@ -86,6 +86,41 @@ fan:
               message: "Fan turned OFF (not supported in real setup)"
               level: warning
 
+# Эмуляция Shelly Dimmer как light entity (для тестирования light support)
+light:
+  - platform: template
+    lights:
+      shelly_dimmer_fan:
+        friendly_name: "Test Light (Shelly Dimmer for Fan)"
+        value_template: "on"  # Всегда включен
+        level_template: >
+          {{ ((states('input_number.light_fan_speed') | int) * 255 / 100) | int }}
+        turn_on:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ brightness_pct is defined }}"
+                sequence:
+                  - service: input_number.set_value
+                    target:
+                      entity_id: input_number.light_fan_speed
+                    data:
+                      value: "{{ brightness_pct }}"
+                  - service: system_log.write
+                    data:
+                      message: "Light brightness set to {{ brightness_pct }}%"
+                      level: info
+            default:
+              - service: system_log.write
+                data:
+                  message: "Light turned ON (no brightness specified)"
+                  level: info
+        turn_off:
+          - service: system_log.write
+            data:
+              message: "Light turned OFF (not supported in real setup)"
+              level: warning
+
 # ============================================================================
 # HELPER ENTITIES (для управления тестовыми устройствами)
 # ============================================================================
@@ -110,6 +145,16 @@ input_number:
     initial: 30
     unit_of_measurement: "%"
     icon: mdi:fan
+
+  # Текущая скорость вентилятора через light entity (для тестирования light support)
+  light_fan_speed:
+    name: "Current Light Fan Speed"
+    min: 0
+    max: 100
+    step: 1
+    initial: 30
+    unit_of_measurement: "%"
+    icon: mdi:lightbulb-on
 
 input_boolean:
   # Эмуляция входов Shelly
@@ -269,12 +314,17 @@ script:
           level: warning
 
 # ============================================================================
-# КОНФИГУРАЦИЯ SMART VENT (когда компонент будет готов)
+# КОНФИГУРАЦИЯ SMART VENT
 # ============================================================================
 
-# Раскомментируй после создания компонента:
+# Smart Vent поддерживает как fan.*, так и light.* entities
+# Для Shelly Dimmer в продакшене используй light entity:
 smart_vent:
-  fan_entity: fan.real_fan
+  # Используй light entity для тестирования (как в продакшене с Shelly Dimmer):
+  fan_entity: light.shelly_dimmer_fan
+  # Или используй fan entity для тестирования обратной совместимости:
+  # fan_entity: fan.real_fan
+
   humidity_sensor: sensor.temperature_humidity_sensor_9970_humidity
   input_0: binary_sensor.shelly_input_0
   input_1: binary_sensor.shelly_input_1
@@ -282,5 +332,7 @@ smart_vent:
     low: 30
     mid: 52
     boost: 100
-  check_interval: 20
+  check_interval: 5
+  auto_boost_duration: 5
   max_boosts_per_day: 5
+

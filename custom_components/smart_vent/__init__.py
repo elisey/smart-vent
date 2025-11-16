@@ -67,10 +67,36 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     conf = config[DOMAIN]
 
+    # Validate fan entity exists and is of correct type
+    fan_entity = conf["fan_entity"]
+    fan_state = hass.states.get(fan_entity)
+
+    if fan_state is None:
+        _LOGGER.error(
+            "Fan entity '%s' not found. Please check your configuration.",
+            fan_entity
+        )
+        return False
+
+    # Check if entity is fan or light type
+    if not (fan_entity.startswith("fan.") or fan_entity.startswith("light.")):
+        _LOGGER.error(
+            "Fan entity '%s' must be either a fan.* or light.* entity. "
+            "Light entities are typically used for Shelly Dimmers controlling fans.",
+            fan_entity
+        )
+        return False
+
+    _LOGGER.info(
+        "Using %s entity '%s' for fan control",
+        "light" if fan_entity.startswith("light.") else "fan",
+        fan_entity
+    )
+
     # Create the coordinator
     coordinator = SmartVentCoordinator(
         hass=hass,
-        fan_entity=conf["fan_entity"],
+        fan_entity=fan_entity,
         humidity_sensor=conf["humidity_sensor"],
         input_0=conf["input_0"],
         input_1=conf["input_1"],
