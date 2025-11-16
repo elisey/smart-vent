@@ -203,7 +203,7 @@ class SmartVentCoordinator(DataUpdateCoordinator):
 
         # Check daily limit
         if self.auto_boost_count_today >= self.max_boosts_per_day:
-            _LOGGER.debug(
+            _LOGGER.warning(
                 "Auto-boost check: daily limit reached (%d/%d)",
                 self.auto_boost_count_today,
                 self.max_boosts_per_day,

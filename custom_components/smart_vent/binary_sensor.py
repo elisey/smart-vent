@@ -25,6 +25,7 @@ async def async_setup_platform(
         return
 
     coordinator = discovery_info["coordinator"]
+    _LOGGER.info("Auto Boost binary sensor created")
     async_add_entities([SmartVentAutoBoostSensor(coordinator)], True)
 
 
