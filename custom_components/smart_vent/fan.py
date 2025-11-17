@@ -66,6 +66,23 @@ class SmartVentFan(CoordinatorEntity, FanEntity):
         _LOGGER.debug("Fan extra_state_attributes: %s", attrs)
         return attrs
 
+    async def async_set_percentage(self, percentage: int) -> None:
+        """Set the speed percentage of the fan.
+
+        This directly sets the fan speed, bypassing mode logic.
+        For mode-based control, use the smart_vent.set_mode service instead.
+        """
+        if percentage < 0 or percentage > 100:
+            _LOGGER.error("Invalid percentage %d, must be 0-100", percentage)
+            return
+
+        _LOGGER.info("Setting fan speed to %d%% via fan entity", percentage)
+        await self.coordinator._set_fan_speed(percentage)
+
+        # Update the coordinator's target speed to reflect the manual change
+        self.coordinator.target_speed = percentage
+        self.async_write_ha_state()
+
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""

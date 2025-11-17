@@ -120,6 +120,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     def async_state_changed_listener(event):
         """Handle state changes of monitored entities."""
         entity_id = event.data.get("entity_id")
+        new_state = event.data.get("new_state")
+
+        # Ignore transitions to unavailable/unknown states during startup
+        if new_state and new_state.state in ("unavailable", "unknown", None):
+            _LOGGER.debug("Ignoring state change to %s for %s", new_state.state, entity_id)
+            return
+
         _LOGGER.debug("State change detected for %s, triggering immediate refresh", entity_id)
         # Use async_refresh() instead of async_request_refresh() to bypass debounce
         hass.async_create_task(coordinator.async_refresh())

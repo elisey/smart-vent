@@ -77,6 +77,17 @@ class SmartVentCoordinator(DataUpdateCoordinator):
         state_0 = self.hass.states.get(self.input_0)
         state_1 = self.hass.states.get(self.input_1)
 
+        # Debug: log the full state objects
+        if state_0 is None:
+            _LOGGER.debug("Input 0 entity '%s' not found in state registry", self.input_0)
+        else:
+            _LOGGER.debug("Input 0 state object: %s (state=%s)", state_0, state_0.state)
+
+        if state_1 is None:
+            _LOGGER.debug("Input 1 entity '%s' not found in state registry", self.input_1)
+        else:
+            _LOGGER.debug("Input 1 state object: %s (state=%s)", state_1, state_1.state)
+
         input_0_state = state_0.state if state_0 else None
         input_1_state = state_1.state if state_1 else None
 
