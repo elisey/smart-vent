@@ -67,18 +67,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     conf = config[DOMAIN]
 
-    # Validate fan entity exists and is of correct type
+    # Validate fan entity type (but don't check if it exists yet - it may load later)
     fan_entity = conf["fan_entity"]
-    fan_state = hass.states.get(fan_entity)
 
-    if fan_state is None:
-        _LOGGER.error(
-            "Fan entity '%s' not found. Please check your configuration.",
-            fan_entity
-        )
-        return False
-
-    # Check if entity is fan or light type
+    # Check if entity is fan or light type based on entity_id format
     if not (fan_entity.startswith("fan.") or fan_entity.startswith("light.")):
         _LOGGER.error(
             "Fan entity '%s' must be either a fan.* or light.* entity. "
@@ -87,11 +79,22 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         )
         return False
 
+    # Log the entity type and note that it may not be available yet
+    entity_type = "light" if fan_entity.startswith("light.") else "fan"
     _LOGGER.info(
-        "Using %s entity '%s' for fan control",
-        "light" if fan_entity.startswith("light.") else "fan",
+        "Configuring Smart Vent to use %s entity '%s' for fan control",
+        entity_type,
         fan_entity
     )
+
+    # Check if entity exists (but only warn, don't fail)
+    fan_state = hass.states.get(fan_entity)
+    if fan_state is None:
+        _LOGGER.warning(
+            "Fan entity '%s' not found yet. It may not have loaded. "
+            "The component will wait for it to become available.",
+            fan_entity
+        )
 
     # Create the coordinator
     coordinator = SmartVentCoordinator(
