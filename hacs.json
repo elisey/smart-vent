@@ -1,0 +1,7 @@
+{
+  "name": "Smart Ventilation Controller",
+  "content_in_root": false,
+  "filename": "smart_vent",
+  "render_readme": true,
+  "homeassistant": "2025.10.3"
+}
